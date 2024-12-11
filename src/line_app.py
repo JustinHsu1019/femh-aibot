@@ -19,7 +19,7 @@ line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 # API Endpoint to query the LLM
-API_URL = "http://34.81.110.126:5000/api/chat"
+API_URL = "http://127.0.0.1:5002/api/chat"
 
 @app.route("/callback", methods=['POST'])
 def callback():
