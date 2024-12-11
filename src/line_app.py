@@ -1,90 +1,67 @@
 from flask import Flask, request, jsonify
 import requests
-import os
-import uuid
+from linebot import LineBotApi, WebhookHandler
+from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from linebot.exceptions import InvalidSignatureError
+
+import utils.config_log as config_log
+
+config, logger, CONFIG_PATH = config_log.setup_config_and_logging()
+config.read(CONFIG_PATH)
 
 app = Flask(__name__)
 
-# 定義存放來源檔案的目錄
-TEMP_STORAGE_DIR = "temp_storage"
-os.makedirs(TEMP_STORAGE_DIR, exist_ok=True)
+# LINE Channel Access Token and Channel Secret
+LINE_CHANNEL_ACCESS_TOKEN = config.get('Line', 'channel_access_token')
+LINE_CHANNEL_SECRET = config.get('Line', 'secret')
 
-@app.route('/line_webhook', methods=['POST'])
-def line_webhook():
-    # 從 LINE 收到的輸入
-    user_data = request.get_json()
-    user_input = user_data.get("message", "")
+line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
+handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-    # 模擬請求後端聊天 API
-    api_url = "http://127.0.0.1:5001/api/chat"
+# API Endpoint to query the LLM
+API_URL = "http://34.81.110.126:5000/api/chat"
+
+@app.route("/callback", methods=['POST'])
+def callback():
+    # Get request headers and body
+    signature = request.headers['X-Line-Signature']
+    body = request.get_data(as_text=True)
+
+    try:
+        handler.handle(body, signature)
+    except InvalidSignatureError:
+        return "Invalid signature", 400
+
+    return "OK", 200
+
+@handler.add(MessageEvent, message=TextMessage)
+def handle_message(event):
+    user_input = event.message.text  # User's message from LINE
+
+    # Prepare payload for the external API
     payload = {"message": user_input}
     headers = {"Content-Type": "application/json"}
 
     try:
-        response = requests.post(api_url, json=payload, headers=headers)
+        # Send request to the external API
+        response = requests.post(API_URL, json=payload, headers=headers)
         response_data = response.json()
+
+        # Extract the llm_output
+        llm_output = response_data.get("llm", "無法取得回應")
+
+        # Send the llm_output back to the user on LINE
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text=llm_output)
+        )
     except Exception as e:
-        return jsonify({"error": f"API error: {e}"}), 500
+        # Handle any exceptions and send an error message
+        error_message = f"發生錯誤: {str(e)}"
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text=error_message)
+        )
 
-    # 提取返回資料
-    llm_output = response_data.get("llm", "無法取得回應")
-    retriv_output = response_data.get("retriv", "[]")
-
-    # 創建臨時連結
-    retriv_links = create_temp_links(retriv_output)
-
-    # 返回結果
-    result = {
-        "llm": llm_output,
-        "source_links": retriv_links,
-    }
-    return jsonify(result)
-
-
-@app.route('/retriv/<unique_id>', methods=['GET'])
-def retriv_content(unique_id):
-    """
-    提供 retriv 的檔案內容
-    """
-    file_path = os.path.join(TEMP_STORAGE_DIR, f"{unique_id}.txt")
-    if not os.path.exists(file_path):
-        return "Content not found", 404
-
-    with open(file_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    return f"<h1>Source Content</h1><p>{content}</p>"
-
-
-def create_temp_links(retriv_output):
-    """
-    將 retriv 資料存成檔案並創建超連結
-    """
-    import json
-    try:
-        retriv_items = json.loads(retriv_output.replace("'", '"'))  # 確保格式正確
-    except Exception as e:
-        return f"Invalid retriv format: {e}"
-
-    links = []
-    for item in retriv_items:
-        title = item.get("title", "No Title")
-        content = item.get("content", "No Content")
-
-        # 生成唯一檔案名稱
-        unique_id = str(uuid.uuid4())
-        file_path = os.path.join(TEMP_STORAGE_DIR, f"{unique_id}.txt")
-
-        # 將內容存成檔案
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(content)
-
-        # 創建臨時 URL
-        link = f"<a href='/retriv/{unique_id}' target='_blank'>{title}</a>"
-        links.append(link)
-
-    # 返回 HTML 格式的連結
-    return "<br>".join(links)
-
-
-if __name__ == '__main__':
-    app.run(port=5000, debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)

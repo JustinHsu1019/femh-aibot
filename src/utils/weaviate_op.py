@@ -1,17 +1,30 @@
 import os
+import sys
 
+import voyageai
 import weaviate
 from langchain.embeddings import OpenAIEmbeddings
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import utils.config_log as config_log
 
 config, logger, CONFIG_PATH = config_log.setup_config_and_logging()
 config.read(CONFIG_PATH)
 
+voyage_api_key = config.get('VoyageAI', 'api_key')
 wea_url = config.get('Weaviate', 'weaviate_url')
 PROPERTIES = ['uuid', 'title', 'content']
 
 os.environ['OPENAI_API_KEY'] = config.get('OpenAI', 'api_key')
+
+
+def rerank_with_voyage(query, documents, api_key):
+    vo = voyageai.Client(api_key=api_key)
+    reranking = vo.rerank(query, documents, model='rerank-2', top_k=5)
+
+    top_documents = [result.document for result in reranking.results]
+
+    return top_documents
 
 
 class WeaviateSemanticSearch:
@@ -24,7 +37,7 @@ class WeaviateSemanticSearch:
     def aggregate_count(self):
         return self.client.query.aggregate(self.classnm).with_meta_count().do()
 
-    def get_all_data(self, limit=3):
+    def get_all_data(self, limit=100):
         if self.client.schema.exists(self.classnm):
             result = self.client.query.get(class_name=self.classnm, properties=PROPERTIES).with_limit(limit).do()
             return result
@@ -61,18 +74,18 @@ class WeaviateSemanticSearch:
 
 
 def search_do(input_, alp):
-    searcher = WeaviateSemanticSearch("Courses_0804")
-    results = searcher.hybrid_search(input_, 3, alpha=alp)
+    searcher = WeaviateSemanticSearch("Femhdata")
+    results = searcher.hybrid_search(input_, 100, alpha=alp)
 
     result_li = []
     for _, result in enumerate(results, 1):
-        result_li.append({'title': result['title'], 'content': result['content']})
+        result_li.append(result['content'])
 
-    return result_li
+    return rerank_with_voyage(input_, result_li, voyage_api_key)
 
 
 if __name__ == '__main__':
-    vdb = "Courses_0804"
+    vdb = "Femhdata"
     client = WeaviateSemanticSearch(vdb)
 
     # 統計筆數
@@ -80,8 +93,8 @@ if __name__ == '__main__':
     print(count_result)
 
     # 輸出所有資料
-    data_result = client.get_all_data()
-    print(data_result)
+    # data_result = client.get_all_data()
+    # print(data_result)
 
     # 刪除此向量庫
     # client.delete_class()

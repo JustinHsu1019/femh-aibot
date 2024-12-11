@@ -7,7 +7,7 @@ from utils.ai.gpt_tem import gpt_template
 def call_aied(wait, quest, use_gpt: bool):
     # current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    prompt = f"""You are a helpful and informative bot that answers questions using text from the reference passage included below. \
+    prompt = f"""You are a helpful and informative healthcare bot that answers questions using text from the reference passage included below. \
 Be sure to respond in a complete sentence, being comprehensive, including all relevant background information. \
 However, you are talking to a non-technical audience, so be sure to break down complicated concepts and \
 strike a friendly and conversational tone. \
@@ -19,9 +19,11 @@ PASSAGE:
 
 {wait[2]}
 
-[User Question]: '{quest}'
+{wait[3]}
 
-Please answer in the language used by the [User Question] (ensure your response matches the user's input language exactly, don't care the language of the PASSAGE).
+{wait[4]}
+
+[User Question]: '{quest}'
 
 ANSWER:
 """

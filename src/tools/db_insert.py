@@ -1,8 +1,13 @@
 import time
 import uuid
+import sys
+import os
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import utils.config_log as config_log
 import weaviate
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 
 config, logger, CONFIG_PATH = config_log.setup_config_and_logging()
 config.read(CONFIG_PATH)
@@ -62,21 +67,18 @@ class WeaviateManager:
                     raise
 
 
-if __name__ == '__main__1':
+if __name__ == '__main__':
     """ insert data to weaviate (Template)"""
-    manager = WeaviateManager("")
+    manager = WeaviateManager("femhdata")
 
-    with open('data/xxx.txt', encoding='utf-8') as file:
+    with open('data/merged_output.txt', encoding='utf-8') as file:
         content = file.read()
 
-    new_cp = content.split('femh')
+    # new_cp = content.split('femh')
+    # 因為 merged_output.txt 沒有用 'femh' 預先分好
+    # 所以需要用 langchain 的 textsplitter 來切分，設定 Tokens 2000, overlap=500
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=500)
+    new_cp = text_splitter.split_text(content)
 
-    for i in new_cp:
-        lines = i.splitlines()
-        if len(lines) > 1:
-            first_line = lines[1]
-            remaining_lines = '\n'.join(lines[2:])
-            print('第一行' + first_line)
-            print('剩下行' + remaining_lines)
-            print('\n\n')
-            manager.insert_data(first_line, remaining_lines)
+    for lines in new_cp:
+        manager.insert_data("", lines)

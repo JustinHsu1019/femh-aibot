@@ -63,7 +63,7 @@ class ChatBot(Resource):
         # pre1qa = request.json.get('pre1qa') or {'q': '', 'a': ''}
         # pre2qa = request.json.get('pre2qa') or {'q': '', 'a': ''}
 
-        alpha = 0.5
+        alpha = 0.8
 
         use_gpt = True
 
