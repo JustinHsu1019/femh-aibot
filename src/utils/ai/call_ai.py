@@ -4,7 +4,7 @@ from utils.ai.gemini_tem import gemini_template
 from utils.ai.gpt_tem import gpt_template
 
 
-def call_aied(wait, quest, use_gpt: bool):
+def call_aied(passage, quest, use_gpt: bool):
     # current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     prompt = f"""You are a helpful and informative healthcare bot that answers questions using text from the reference passage included below. \
@@ -13,15 +13,15 @@ However, you are talking to a non-technical audience, so be sure to break down c
 strike a friendly and conversational tone. \
 
 PASSAGE:
-'{wait[0]}
+'{passage[0]}
 
-{wait[1]}
+{passage[1]}
 
-{wait[2]}
+{passage[2]}
 
-{wait[3]}
+{passage[3]}
 
-{wait[4]}
+{passage[4]}
 
 [User Question]: '{quest}'
 
